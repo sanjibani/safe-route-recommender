@@ -19,7 +19,8 @@ app.mount("/static", StaticFiles(directory="backend/static"), name="static")
 
 @app.get("/")
 async def root():
-    return {"message": "Safe Route Recommender API is running (Serverless Mode). Go to /static/index.html"}
+    from fastapi.responses import FileResponse
+    return FileResponse("backend/static/index.html")
 
 @app.post("/route", response_model=List[schemas.RouteResponse])
 async def get_safe_route(request: schemas.RouteRequest):
