@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+httpx
+pandas
+python-dotenv
+# Removed: sqlalchemy, geoalchemy2, psycopg2, shapely, geopandas (too heavy/unneeded)

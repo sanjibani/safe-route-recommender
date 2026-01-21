@@ -1,0 +1,6 @@
+crime_type,description,date_time,latitude,longitude,severity_score
+Theft,Stolen bike,2023-10-26 10:00:00,28.6139,77.2090,2.0
+Assault,Physical altercation,2023-10-27 22:30:00,28.6145,77.2095,8.0
+Robbery,Armed robbery,2023-10-28 01:15:00,28.6150,77.2100,9.0
+Harassment,Verbal harassment,2023-10-29 18:45:00,28.6120,77.2080,4.0
+Theft,Pickpocket,2023-10-30 14:00:00,28.6130,77.2085,2.0

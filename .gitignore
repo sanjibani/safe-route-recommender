@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+osrm-data/
+data/crime_2022.csv
+# Keep processed_crime.csv for the app to work on Vercel
+!.gitignore

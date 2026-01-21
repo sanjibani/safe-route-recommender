@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Safe Route Recommender</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            width: 320px;
+            max-width: 90%;
+        }
+
+        #explanation-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            width: 300px;
+            max-width: 90%;
+            border-left: 5px solid #007bff;
+            display: none;
+        }
+
+        h2,
+        h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        h2 {
+            font-size: 18px;
+        }
+
+        h3 {
+            font-size: 16px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 12px;
+            color: #666;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1001;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .suggestions div {
+            padding: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .suggestions div:hover {
+            background-color: #f8f9fa;
+        }
+
+        #info {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #444;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+
+        .route-info {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            border-left: 4px solid #ccc;
+            cursor: pointer;
+        }
+
+        .route-info:hover {
+            background-color: #e2e6ea;
+        }
+
+        .explanation-card {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .explanation-card.safe {
+            background-color: #e6fffa;
+            border: 1px solid #b2f5ea;
+            color: #234e52;
+        }
+
+        .explanation-card.moderate {
+            background-color: #fffaf0;
+            border: 1px solid #fbd38d;
+            color: #744210;
+        }
+
+        .explanation-card.danger {
+            background-color: #fff5f5;
+            border: 1px solid #feb2b2;
+            color: #9b2c2c;
+        }
+
+        .placeholder {
+            font-size: 14px;
+            color: #777;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="controls">
+        <h2>Delhi Safe Route</h2>
+
+        <div class="input-group">
+            <label>Start Location</label>
+            <input type="text" id="start-input" placeholder="Type to search..." value="Connaught Place"
+                autocomplete="off">
+            <div id="start-suggestions" class="suggestions"></div>
+            <input type="hidden" id="start-lat" value="28.6139">
+            <input type="hidden" id="start-lon" value="77.2090">
+        </div>
+
+        <div class="input-group">
+            <label>Destination</label>
+            <input type="text" id="end-input" placeholder="Type to search..." value="India Gate" autocomplete="off">
+            <div id="end-suggestions" class="suggestions"></div>
+            <input type="hidden" id="end-lat" value="28.6129">
+            <input type="hidden" id="end-lon" value="77.2295">
+        </div>
+
+        <button onclick="getRoute()">Find Safest Route</button>
+        <div id="info"></div>
+    </div>
+
+    <!-- Right Side Explanation Panel -->
+    <div id="explanation-panel">
+        <h3>Route Analysis</h3>
+        <p class="placeholder">Select a route to view detailed safety insights.</p>
+        <div id="explanation-content"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([28.6139, 77.2090], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        var markers = [];
+
+        function setupAutocomplete(inputId, suggestionsId, latId, lonId) {
+            const input = document.getElementById(inputId);
+            const suggestions = document.getElementById(suggestionsId);
+            const latField = document.getElementById(latId);
+            const lonField = document.getElementById(lonId);
+            let debounceTimer;
+
+            input.addEventListener('input', function () {
+                const query = this.value;
+                clearTimeout(debounceTimer);
+                if (query.length < 3) { suggestions.style.display = 'none'; return; }
+
+                debounceTimer = setTimeout(() => {
+                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=76.8,28.9,77.4,28.4&bounded=1&limit=5`;
+                    fetch(url).then(r => r.json()).then(data => {
+                        suggestions.innerHTML = '';
+                        if (data.length > 0) {
+                            suggestions.style.display = 'block';
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.textContent = item.display_name.split(',').slice(0, 3).join(',');
+                                div.addEventListener('click', () => {
+                                    input.value = item.display_name.split(',')[0];
+                                    latField.value = item.lat;
+                                    lonField.value = item.lon;
+                                    suggestions.style.display = 'none';
+                                    L.circleMarker([item.lat, item.lon], { radius: 5, color: '#007bff' }).addTo(map).bindPopup("Selected").openPopup();
+                                    map.panTo([item.lat, item.lon]);
+                                });
+                                suggestions.appendChild(div);
+                            });
+                        } else { suggestions.style.display = 'none'; }
+                    }).catch(console.error);
+                }, 300);
+            });
+            document.addEventListener('click', e => { if (e.target !== input && e.target !== suggestions) suggestions.style.display = 'none'; });
+        }
+
+        setupAutocomplete('start-input', 'start-suggestions', 'start-lat', 'start-lon');
+        setupAutocomplete('end-input', 'end-suggestions', 'end-lat', 'end-lon');
+
+        function getRoute() {
+            var startLat = document.getElementById('start-lat').value;
+            var startLon = document.getElementById('start-lon').value;
+            var endLat = document.getElementById('end-lat').value;
+            var endLon = document.getElementById('end-lon').value;
+
+            if (!startLat || !endLat) { alert("Please select locations."); return; }
+
+            markers.forEach(l => map.removeLayer(l));
+            markers = [];
+
+            var startMarker = L.marker([startLat, startLon]).addTo(map).bindPopup("Start");
+            var endMarker = L.marker([endLat, endLon]).addTo(map).bindPopup("End");
+            markers.push(startMarker);
+            markers.push(endMarker);
+            var group = new L.featureGroup([startMarker, endMarker]);
+            map.fitBounds(group.getBounds().pad(0.2));
+
+            document.getElementById('info').innerHTML = "Calculating...";
+            document.getElementById('explanation-panel').style.display = 'block';
+            document.getElementById('explanation-content').innerHTML = "";
+            document.querySelector('.placeholder').style.display = 'block';
+
+            fetch('/route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start_lat: parseFloat(startLat), start_lon: parseFloat(startLon), end_lat: parseFloat(endLat), end_lon: parseFloat(endLon) })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    var infoDiv = document.getElementById('info');
+                    infoDiv.innerHTML = "";
+                    if (data.length === 0) { infoDiv.innerHTML = "No routes found."; return; }
+
+                    // Process routes
+                    data.forEach((route, index) => {
+                        var isBest = index === 0;
+
+                        // Create Sidebar Card
+                        var div = document.createElement('div');
+                        div.className = 'route-info';
+                        div.id = 'route-card-' + index;
+                        div.innerHTML = `
+                        <strong>Option ${index + 1}</strong> 
+                        ${isBest ? '<span style="color:green; float:right;">Safest</span>' : ''}<br>
+                        Safety Score: <b>${route.safety_score}</b><br>
+                        Time: ${Math.round(route.duration_seconds / 60)} mins
+                    `;
+                        div.onclick = () => selectRoute(route, index, data);
+                        infoDiv.appendChild(div);
+
+                        // Create Map Layer
+                        try {
+                            var geojson = JSON.parse(route.geometry);
+                            var layer = L.geoJSON(geojson, {
+                                style: { color: '#6c757d', weight: 4, opacity: 0.6 }, // Default inactive style
+                                onEachFeature: (f, l) => {
+                                    l.bindPopup(`Route ${index + 1}<br>Score: ${route.safety_score}`);
+                                    l.on('click', () => selectRoute(route, index, data));
+                                }
+                            }).addTo(map);
+                            route.layer = layer; // Store reference
+                            markers.push(layer);
+                        } catch (e) { console.error("GeoJSON error", e); }
+                    });
+
+                    // Automatically select the best route (index 0)
+                    if (data.length > 0) selectRoute(data[0], 0, data);
+                })
+                .catch(e => { console.error(e); document.getElementById('info').innerHTML = "Error."; });
+        }
+
+        function selectRoute(route, index, allRoutes) {
+            // Update UI for all routes
+            allRoutes.forEach((r, i) => {
+                var isSelected = i === index;
+
+                // Update Map Layer
+                if (r.layer) {
+                    r.layer.setStyle({
+                        color: isSelected ? (i === 0 ? '#28a745' : '#007bff') : '#6c757d', // Green if best, Blue if selected others, Grey inactive
+                        weight: isSelected ? 7 : 4,
+                        opacity: isSelected ? 1.0 : 0.5
+                    });
+                    if (isSelected) r.layer.bringToFront();
+                }
+
+                // Update Sidebar Card
+                var card = document.getElementById('route-card-' + i);
+                if (card) {
+                    card.style.backgroundColor = isSelected ? '#e3f2fd' : '#f8f9fa';
+                    card.style.borderLeftColor = isSelected ? '#007bff' : '#ccc';
+                    if (i === 0) card.style.borderLeftColor = '#28a745'; // Maintain green for best
+                }
+            });
+
+            // Update Explanation Panel
+            showExplanation(route, index + 1);
+        }
+
+        function showExplanation(route, index) {
+            var panel = document.getElementById('explanation-content');
+            var placeholder = document.querySelector('.placeholder');
+            placeholder.style.display = 'none';
+
+            var scoreClass = route.safety_score > 80 ? 'safe' : (route.safety_score > 50 ? 'moderate' : 'danger');
+
+            var analysisHTML = "";
+            if (route.analysis && route.analysis.length > 0) {
+                analysisHTML = '<ul style="padding-left: 20px; margin: 10px 0;">' +
+                    route.analysis.map(pt => `<li style="margin-bottom: 5px;">${pt}</li>`).join('') +
+                    '</ul>';
+            } else {
+                analysisHTML = `<p>${route.description || "No specific insights available."}</p>`;
+            }
+
+            panel.innerHTML = `
+                <div class="explanation-card ${scoreClass}">
+                    <h4>Route ${index} Analysis</h4>
+                    ${analysisHTML}
+                    <hr style="border:0; border-top:1px solid #ddd; margin:10px 0;">
+                    <p><strong>Score:</strong> ${route.safety_score} / 100</p>
+                    <p><strong>Details:</strong> ${(route.distance_meters / 1000).toFixed(1)} km in ~${Math.round(route.duration_seconds / 60)} mins</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+
+</html>
